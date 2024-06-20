@@ -34,8 +34,9 @@ const (
 	EthStakeInbox    = "0x121E240000000000000000000000000000000003"
 
 	// Octane Predeploys.
-	Staking  = "0xcccccc0000000000000000000000000000000001"
-	Slashing = "0xcccccc0000000000000000000000000000000002"
+	Staking    = "0xcccccc0000000000000000000000000000000001"
+	Slashing   = "0xcccccc0000000000000000000000000000000002"
+	Governance = "0xcccccc0000000000000000000000000000000003"
 
 	// TransparentUpgradeableProxy storage slots.
 	ProxyImplementationSlot = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
@@ -61,6 +62,7 @@ var (
 	stakingCode        = hexutil.MustDecode(bindings.StakingDeployedBytecode)
 	slashingCode       = hexutil.MustDecode(bindings.SlashingDeployedBytecode)
 	omniBridgeCode     = hexutil.MustDecode(bindings.OmniBridgeNativeDeployedBytecode)
+	governanceCode     = hexutil.MustDecode(bindings.GovernanceDeployedBytecode)
 )
 
 // Alloc returns the genesis allocs for the predeployed contracts, initializing code and storage.
@@ -89,6 +91,10 @@ func Alloc(network netconf.ID, admin common.Address) (types.GenesisAlloc, error)
 
 	if err := setSlashing(db); err != nil {
 		return nil, errors.Wrap(err, "set slashing")
+	}
+
+	if err := setGovernance(db, admin); err != nil {
+		return nil, errors.Wrap(err, "set governance")
 	}
 
 	return db.Genesis().Alloc, nil
@@ -154,6 +160,17 @@ func setSlashing(db *state.MemDB) error {
 	storage := state.StorageValues{}
 
 	return setPredeploy(db, slashing, slashingCode, bindings.SlashingStorageLayout, storage)
+}
+
+// setGovernance sets the Governance predeploy.
+// TODO: do we really need this?
+func setGovernance(db *state.MemDB, owner common.Address) error {
+	storage := state.StorageValues{
+		"_initialized": uint8(1), // disable initializer
+		"_owner":       owner,
+	}
+
+	return setPredeploy(db, common.HexToAddress(Governance), governanceCode, bindings.GovernanceStorageLayout, storage)
 }
 
 // setPredeploy sets the implementation code and proxy storage for the given predeploy.
