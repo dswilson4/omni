@@ -4,6 +4,7 @@ import (
 	attestkeeper "github.com/omni-network/omni/halo/attest/keeper"
 	atypes "github.com/omni-network/omni/halo/attest/types"
 	"github.com/omni-network/omni/halo/comet"
+	"github.com/omni-network/omni/halo/evmgovernance"
 	"github.com/omni-network/omni/halo/evmslashing"
 	"github.com/omni-network/omni/halo/evmstaking"
 	registrykeeper "github.com/omni-network/omni/halo/registry/keeper"
@@ -111,7 +112,7 @@ func newApp(
 		return nil, errors.Wrap(err, "dep inject")
 	}
 
-	// TODO(corver): Refactor this to use depinject
+	// TODO: Refactor this to use depinject
 	evmStaking, err := evmstaking.New(engineCl, app.StakingKeeper, app.BankKeeper, app.AccountKeeper)
 	if err != nil {
 		return nil, errors.Wrap(err, "create evm staking")
@@ -122,18 +123,22 @@ func newApp(
 		return nil, errors.Wrap(err, "create evm slashing")
 	}
 
+	evmGovernance, err := evmgovernance.New(engineCl)
+	if err != nil {
+		return nil, errors.Wrap(err, "create evm governance")
+	}
+
 	// Set evmengine vote and evm msg providers.
 	app.EVMEngKeeper.SetVoteProvider(app.AttestKeeper)
 	app.EVMEngKeeper.AddEventProcessor(evmStaking)
 	app.EVMEngKeeper.AddEventProcessor(evmSlashing)
+	app.EVMEngKeeper.AddEventProcessor(evmGovernance)
 	app.EVMEngKeeper.AddEventProcessor(app.RegistryKeeper)
 	app.AttestKeeper.SetValidatorProvider(app.ValSyncKeeper)
 	app.AttestKeeper.SetPortalRegistry(app.RegistryKeeper)
 
 	baseAppOpts = append(baseAppOpts, func(bapp *baseapp.BaseApp) {
 		// Use evm engine to create block proposals.
-		// Note that we do not check MaxTxBytes since all EngineEVM transaction MUST be included since we cannot
-		// postpone them to the next block. Nit: we could drop some vote extensions though...?
 		bapp.SetPrepareProposal(app.EVMEngKeeper.PrepareProposal)
 
 		// Route proposed messages to keepers for verification and external state updates.
